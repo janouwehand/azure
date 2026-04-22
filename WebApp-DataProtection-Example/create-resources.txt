@@ -1,0 +1,45 @@
+az login
+
+-- see available runtimes
+az webapp list-runtimes --os linux
+
+-- create resource group
+az group create --name webapp1rg --location westeurope
+
+-- create app plan (sku: F1/free)
+az appservice plan create --name webapp1plan --resource-group webapp1rg --location westeurope --is-linux --sku F1
+
+-- create webapp, Linux, .NET 10
+az webapp create --name jlo-webapp1 --resource-group webapp1rg --plan webapp1plan --runtime "DOTNETCORE|10.0"
+
+-- Use system-assigned managed identity (necessary for assigning RBAC on key vault and blob storage)
+az webapp identity assign --name jlo-webapp1 --resource-group webapp1rg
+
+-- Verify identity
+az webapp identity show --name jlo-webapp1 --resource-group webapp1rg
+
+
+
+-- create storage account
+az storage account create --name jlostor --resource-group webapp1rg --location westeurope --sku Standard_LRS
+
+-- create keyvault
+az keyvault create --name jlo-keyvault --resource-group webapp1rg --location westeurope --enable-rbac-authorization true
+
+
+
+-- find subscription id
+for /f %%i in ('az account show --query id -o tsv') do set SUBSCRIPTION_ID=%%i
+
+-- find webapp principal id
+for /f %%i in ('az webapp identity show --name jlo-webapp1 --resource-group webapp1rg --query principalId -o tsv') do set WEBAPP_PRINCIPAL_ID=%%i
+
+echo Subscription ID: %SUBSCRIPTION_ID%
+echo WebApp Principal ID: %WEBAPP_PRINCIPAL_ID%
+
+-- assign blob access
+az role assignment create --assignee-object-id %WEBAPP_PRINCIPAL_ID% --assignee-principal-type ServicePrincipal --role "Storage Blob Data Contributor" --scope "/subscriptions/%SUBSCRIPTION_ID%/resourceGroups/webapp1rg/providers/Microsoft.Storage/storageAccounts/jlostor"
+
+-- assign keyvault access
+az role assignment create --assignee-object-id %WEBAPP_PRINCIPAL_ID% --assignee-principal-type ServicePrincipal --role "Key Vault Crypto User" --scope "/subscriptions/%SUBSCRIPTION_ID%/resourceGroups/webapp1rg/providers/Microsoft.KeyVault/vaults/jlo-keyvault"
+

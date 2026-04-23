@@ -1,0 +1,64 @@
+-- build container
+docker build --no-cache -t hello-guid .
+
+-- local test run
+docker run --rm -p 8181:8080 hello-guid
+
+-- login az
+az login
+
+-- Get SUBSCRIPTION_ID
+$env:SUBSCRIPTION_ID = az account show --query id -o tsv
+echo $env:SUBSCRIPTION_ID
+
+--
+$LOCATION = "westeurope"
+$RG = "rg-aci-demo"
+$ACR = "acraciexample"
+$IMAGE = "hello-guid"
+$TAG = "v1"
+$ACI = "aci-hello-guid"
+$DNS = "acihello$(Get-Random -Minimum 10000 -Maximum 99999)"
+
+-- create resource group
+az group create --name $RG --location $LOCATION
+
+-- create container registry (SKU: basic)
+az acr create --resource-group $RG --name $ACR --sku Basic --admin-enabled true
+
+-- log on ontu container registry
+az acr login --name $ACR
+
+-- verify server
+$LOGIN_SERVER = az acr show --name $ACR --resource-group $RG --query loginServer -o tsv
+echo "This is your ACR: $LOGIN_SERVER"
+
+-- build image
+docker build -t ${IMAGE}:${TAG} .
+
+-- tag image
+docker tag ${IMAGE}:${TAG} ${LOGIN_SERVER}/${IMAGE}:${TAG}
+
+-- push image to ACR
+docker push ${LOGIN_SERVER}/${IMAGE}:${TAG}
+
+-- get credentials necessary for creating the ACI container
+$ACR_USERNAME = az acr credential show --name $ACR --query username -o tsv
+$ACR_PASSWORD = az acr credential show --name $ACR --query "passwords[0].value" -o tsv
+
+-- Create container instance
+az container create `
+  --resource-group $RG `
+  --name $ACI `
+  --image ${LOGIN_SERVER}/${IMAGE}:${TAG} `
+  --registry-login-server $LOGIN_SERVER `
+  --registry-username $ACR_USERNAME `
+  --registry-password $ACR_PASSWORD `
+  --dns-name-label $DNS `
+  --ports 8080 `
+  --os-type Linux `
+  --cpu 0.5 `
+  --memory 0.5
+
+$URL = az container show --resource-group $RG --name $ACI --query ipAddress.fqdn -o tsv
+echo "This is the container instance URL: http:// $URL :8080"

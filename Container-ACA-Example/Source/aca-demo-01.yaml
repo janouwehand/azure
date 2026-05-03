@@ -1,0 +1,43 @@
+properties:
+  properties:
+  environmentId: "/subscriptions/5806f3ca-1c74-4242-931b-336502f6e345/resourceGroups/rg-aca-demo-01/providers/Microsoft.App/managedEnvironments/aca-env-demo-01"
+
+  configuration:
+    ingress:
+      external: true
+      allowInsecure: false
+      targetPort: 8080
+      transport: auto
+
+  secrets:
+      - name: acr-password
+        value: "5THmulTj8BEcTRj7PGKJ2CQ6BZ6sP1SnADsiRDNNnewm4sib9O3bJQQJ99CDAC5RqLJEqg7NAAACAZCRuZox"  
+
+  template:
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
+
+    volumes:
+      - name: files
+        storageType: AzureFile
+        storageName: sharedfiles
+
+    containers:
+      - name: web
+        image: acrdemo01xyz.azurecr.io/web:v1
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        volumeMounts:
+          - volumeName: files
+            mountPath: /data
+
+      - name: writer
+        image: acrdemo01xyz.azurecr.io/writer:v1
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        volumeMounts:
+          - volumeName: files
+            mountPath: /data

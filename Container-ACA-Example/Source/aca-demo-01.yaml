@@ -11,7 +11,7 @@ properties:
 
   secrets:
       - name: acr-password
-        value: "5THmulTj8BEcTRj7PGKJ2CQ6BZ6sP1SnADsiRDNNnewm4sib9O3bJQQJ99CDAC5RqLJEqg7NAAACAZCRuZox"  
+        value: "${ACR_PASSWORD}"  
 
   template:
     scale:
